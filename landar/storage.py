@@ -27,6 +27,17 @@ ALTER TABLE devices ADD COLUMN online INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE devices ADD COLUMN vendor TEXT;
 ALTER TABLE devices ADD COLUMN randomized_mac INTEGER NOT NULL DEFAULT 0;
 """,
+"""
+CREATE TABLE networks(id INTEGER PRIMARY KEY, name TEXT UNIQUE NOT NULL,
+  vlan_id INTEGER UNIQUE CHECK(vlan_id IS NULL OR vlan_id BETWEEN 1 AND 4094), cidr TEXT UNIQUE NOT NULL, gateway TEXT,
+  purpose TEXT NOT NULL DEFAULT 'Other', description TEXT, created_at TEXT NOT NULL);
+CREATE TABLE dhcp_scopes(id INTEGER PRIMARY KEY, network_id INTEGER NOT NULL UNIQUE REFERENCES networks(id) ON DELETE CASCADE,
+  range_start TEXT NOT NULL, range_end TEXT NOT NULL, lease_hours INTEGER NOT NULL DEFAULT 12, dns_servers TEXT, enabled INTEGER NOT NULL DEFAULT 1);
+CREATE TABLE dhcp_reservations(id INTEGER PRIMARY KEY, network_id INTEGER NOT NULL REFERENCES networks(id) ON DELETE CASCADE,
+  mac TEXT UNIQUE NOT NULL, ip TEXT UNIQUE NOT NULL, hostname TEXT, description TEXT);
+CREATE TABLE dns_records(id INTEGER PRIMARY KEY, name TEXT UNIQUE NOT NULL, ip TEXT NOT NULL, note TEXT);
+CREATE TABLE dns_forwarders(id INTEGER PRIMARY KEY, address TEXT UNIQUE NOT NULL, label TEXT);
+""",
 ]
 
 def connect() -> sqlite3.Connection:

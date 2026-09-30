@@ -25,11 +25,27 @@ First run creates `admin` with a random password (shown once). Data lives in `~/
 4. Provider: interface in `providers/base.py`, implementation e.g. `providers/opnsense.py`, list in `registry.py`.
 5. Page: `ui/pages/firewall.py` (subclass `TablePage`), add one `PageSpec` line to `ui/registry.py`.
 
+## UI design system
+Matches the supplied HTML design (`code.html`). Tokens live in `ui/theme.py` (colors copied from its Tailwind config); fonts (Inter, JetBrains Mono,
+Material Symbols subset) are bundled in `assets/fonts` so it looks the same everywhere. Reusable pieces: `ui/components.py` (caps labels, chips, KPI cards, section cards).
+Sidebar sections/icons come from `ui/registry.py`. Unbuilt modules show a placeholder page. Qt gotcha: never `setStyleSheet("background:...")` without a selector - it cascades to every child.
+
 ## Discovery (Phase 2)
 Devices page -> **Scan network**. Read-only: nudges each host on your subnet so the OS learns its MAC, then reads the OS ARP table (no admin rights, no sniffing).
 New MACs enter as `Unknown`; nothing is auto-approved. Approve/Block currently record state only - real enforcement needs a router/firewall provider (Phase 5).
 Vendor names: drop the IEEE list (https://standards-oui.ieee.org/oui/oui.csv) into `landar/data/oui.csv`. Randomized (private) MACs are flagged.
 Limits: guest/isolated Wi-Fi may hide other clients; a scan sees only devices on your own subnet. Only scan networks you own or administer.
+
+## Topology (Phase 2)
+`services/topology.py` builds a pure-data graph (internet -> default gateway -> LAN segment -> hosts) from the device inventory; `ui/pages/topology.py` draws it
+(drag to pan, wheel to zoom, click a node for details, set device type, approve/block). Gateway comes from the OS routing table. Without LLDP/SNMP we cannot
+see switches/APs or cabling, so the map shows only what discovery can prove. Switch/AP/VLAN views arrive with those providers.
+
+## Networks, DHCP & DNS
+`services/networks.py` (VLAN/subnet plan: validated, overlap-checked, device counts), `services/dhcp.py` (scopes, reservations, conflict detection, observed addresses),
+`services/dns.py` + `core/dnswire.py` (local records, forwarders, live resolver tests over raw UDP), `services/export.py` (dnsmasq config file).
+This is managed configuration: it is stored, validated and audited, and can be exported, but nothing is pushed to a router/switch until a provider exists (Phase 5/7).
+"Observed addresses" come from scans, not from a real lease table. New permission: `network.configure`.
 
 ## Roadmap
 Phase 2 discovery/topology · 3 RADIUS · 4 policies/VLANs · 5 firewall · 6 monitoring · 7-8 see spec.

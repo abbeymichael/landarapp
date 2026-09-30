@@ -26,3 +26,12 @@ def set_state(actor, device_id, state):
         d = c.execute("SELECT mac,state FROM devices WHERE id=?", (device_id,)).fetchone()
         c.execute("UPDATE devices SET state=? WHERE id=?", (state, device_id))
         audit.record(c, actor.username, f"device_{state.lower()}", d["mac"], old=d["state"], new=state)
+
+def set_type(actor, device_id, device_type):
+    require(actor, "devices.manage")
+    from landar.core.constants import DEVICE_TYPES
+    if device_type not in DEVICE_TYPES: raise ValueError("Unknown device type")
+    with storage.connect() as c:
+        d = c.execute("SELECT mac,device_type FROM devices WHERE id=?", (device_id,)).fetchone()
+        c.execute("UPDATE devices SET device_type=? WHERE id=?", (device_type, device_id))
+        audit.record(c, actor.username, "device_type_changed", d["mac"], old=d["device_type"], new=device_type)

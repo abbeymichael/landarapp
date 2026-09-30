@@ -1,6 +1,6 @@
 """Read-only LAN discovery: nudge every host on the local subnet so the OS learns its MAC (ARP), then read the OS neighbor table.
 No admin rights, no packet sniffing, no credentials. Only scan networks you own or administer."""
-import ipaddress, os, re, socket, subprocess, sys, time
+import ipaddress, os, re, socket, struct, subprocess, sys, time
 from concurrent.futures import ThreadPoolExecutor, wait
 import psutil
 from landar.providers import oui
@@ -40,6 +40,26 @@ def read_neighbors() -> list[tuple[str, str]]:
     res = subprocess.run(["arp", "-a"], capture_output=True, text=True, timeout=10, creationflags=flags)
     return parse_arp_a(res.stdout)
 
+def parse_proc_route(text: str) -> str | None:
+    for line in text.splitlines()[1:]:
+        c = line.split()
+        if len(c) >= 4 and c[1] == "00000000" and int(c[3], 16) & 2: return socket.inet_ntoa(struct.pack("<L", int(c[2], 16)))
+    return None
+
+def parse_route_print(text: str) -> str | None:       # Windows: route print -4
+    m = re.search(r"^\s*0\.0\.0\.0\s+0\.0\.0\.0\s+(\d+\.\d+\.\d+\.\d+)\s", text, re.M); return m.group(1) if m else None
+
+def parse_route_get(text: str) -> str | None:         # macOS: route -n get default
+    m = re.search(r"gateway:\s*(\d+\.\d+\.\d+\.\d+)", text); return m.group(1) if m else None
+
+def default_gateway() -> str | None:
+    try:
+        if os.path.exists("/proc/net/route"):
+            with open("/proc/net/route") as f: return parse_proc_route(f.read())
+        run = lambda cmd: subprocess.run(cmd, capture_output=True, text=True, timeout=10, creationflags=0x08000000 if sys.platform == "win32" else 0).stdout
+        return parse_route_print(run(["route", "print", "-4"])) if sys.platform == "win32" else parse_route_get(run(["route", "-n", "get", "default"]))
+    except Exception: return None
+
 def local_network() -> dict:
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
@@ -53,7 +73,7 @@ def local_network() -> dict:
                 net = ipaddress.ip_network(f"{ip}/{a.netmask}", strict=False)
                 if net.num_addresses > MAX_HOSTS: net = ipaddress.ip_network(f"{ip}/24", strict=False)
                 mac = next((normalize_mac(x.address) for x in addrs if x.family == psutil.AF_LINK and x.address), None)
-                return {"interface": name, "ip": ip, "cidr": str(net), "mac": mac}
+                return {"interface": name, "ip": ip, "cidr": str(net), "mac": mac, "gateway": default_gateway()}
     raise RuntimeError("Could not identify the active network interface")
 
 def _nudge(ip: str) -> None:

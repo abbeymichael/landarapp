@@ -6,14 +6,15 @@ from landar.ui.dialogs import PasswordField
 from landar.ui.pages.base import TablePage, confirm, form_dialog
 
 class UsersPage(TablePage):
-    title = "Users"
+    title, subtitle = "Users & Roles", "People"
+    mono_cols = ("ID", "Username")
     headers = ["ID", "Username", "Name", "Email", "Group", "Role", "Status"]
     def __init__(self, actor):
         super().__init__(actor)
-        self.add_button("Add user", self.add, "users.create")
+        self.add_button("Add user", self.add, "users.create", "primary")
         self.add_button("Enable", lambda: self.set_status("Active"), "users.edit")
-        self.add_button("Disable", lambda: self.set_status("Disabled"), "users.edit")
-        self.add_button("Lock", lambda: self.set_status("Locked"), "users.edit"); self.bar.addStretch()
+        self.add_button("Disable", lambda: self.set_status("Disabled"), "users.edit", "danger")
+        self.add_button("Lock", lambda: self.set_status("Locked"), "users.edit", "danger"); self.bar.addStretch()
     def load_rows(self): return users.list_users(self.actor)
     def add(self):
         u, n, e, p = QLineEdit(), QLineEdit(), QLineEdit(), PasswordField()

@@ -16,3 +16,7 @@ class NetworkProvider(ABC):
         return {}
     def block_mac(self, mac: str) -> None:                  # control: opt-in per provider
         raise NotImplementedError(f"{self.name} does not support blocking")
+    def apply_firewall(self, rules: list[dict]) -> dict:    # control: push an ordered rule set
+        """Push the ordered firewall rule set. Read-only providers must not pretend.
+        Return {'applied': bool, 'message': str}. Raise NotImplementedError if unsupported."""
+        raise NotImplementedError(f"{self.name} is a read-only provider and cannot push firewall rules")

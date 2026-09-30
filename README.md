@@ -47,5 +47,24 @@ see switches/APs or cabling, so the map shows only what discovery can prove. Swi
 This is managed configuration: it is stored, validated and audited, and can be exported, but nothing is pushed to a router/switch until a provider exists (Phase 5/7).
 "Observed addresses" come from scans, not from a real lease table. New permission: `network.configure`.
 
+## Sessions (Phase 3)
+`services/sessions.py` records an authenticated user on a device for a period (user, device, IP, MAC, network, auth source, state).
+Without a RADIUS provider it is driven by the local auth flow or started/ended manually; usage counters are only what is recorded. Page: **People → Active Sessions**.
+
+## Policies, bandwidth & schedules (Phase 4)
+`core/policy.py` is the pure decision engine (`USER + GROUP + DEVICE + NETWORK + TIME + POLICY = ACCESS DECISION`; deny wins, default deny).
+`services/policies.py` stores named policies with per-zone Allow/Deny/Reject (`policy_zones`) and exposes `preview()` — the **Policy Engine** page's Access Evaluator shows the verdict *and the trace that produced it*.
+`services/bandwidth.py` stores rate limits (canonical Kbps, shown in the authored unit) by scope Role/Group/Network/VLAN/User/Device; `services/schedules.py` stores time windows (days, HH:MM, midnight-spanning, max session).
+Effective per-class bandwidth appears as a matrix on the Policy Engine page. Pages: **Security & Access → Policy Engine / Bandwidth / Access Schedules**.
+
+## Firewall (Phase 5)
+`services/firewall.py`: ordered rules (`SOURCE → DESTINATION → PORT → PROTOCOL → ACTION → LOGGING`), validated, audited, with Move up/down so **order is always visible**.
+Managed configuration only: **Push to device** calls `NetworkProvider.apply_firewall()`, which the read-only LAN provider declines — the UI reports that honestly instead of pretending a rule is live. Permission: `firewall.view` / `firewall.edit`. Page: **Security & Access → Firewall Rules**.
+
+## Monitoring & alerts (Phase 6)
+`services/alerts.py` derives alerts from real observations (unknown devices, repeated auth failures, blocked devices, expired accounts), de-duplicated, with INFO/WARNING/CRITICAL severity and an Open/Acknowledged/Resolved lifecycle.
+`ui/pages/monitoring.py` shows what LANDAR can actually measure (psutil interface throughput, gateway ping, last-scan health) and labels the parts that need an SNMP/agent provider. Pages: **Observability → Live Monitoring / Alerts & Incidents**.
+
 ## Roadmap
-Phase 2 discovery/topology · 3 RADIUS · 4 policies/VLANs · 5 firewall · 6 monitoring · 7-8 see spec.
+Phase 2 discovery/topology · **3 sessions** · **4 policies / bandwidth / schedules** · **5 firewall** · **6 monitoring & alerts** · 7 remote admin · 8 captive portal, multi-vendor, reporting, plugins.
+Still placeholders (need providers/infra): RADIUS & LDAP auth, captive portal, Reports export, Credential Vault, Settings.

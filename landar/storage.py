@@ -38,6 +38,42 @@ CREATE TABLE dhcp_reservations(id INTEGER PRIMARY KEY, network_id INTEGER NOT NU
 CREATE TABLE dns_records(id INTEGER PRIMARY KEY, name TEXT UNIQUE NOT NULL, ip TEXT NOT NULL, note TEXT);
 CREATE TABLE dns_forwarders(id INTEGER PRIMARY KEY, address TEXT UNIQUE NOT NULL, label TEXT);
 """,
+"""
+-- Phase 3: sessions + network-scoped credentials ---------------------------------
+CREATE TABLE sessions(id INTEGER PRIMARY KEY, user_id INTEGER REFERENCES users(id) ON DELETE SET NULL, username TEXT NOT NULL,
+  device_id INTEGER REFERENCES devices(id) ON DELETE SET NULL, ip TEXT, mac TEXT, network_id INTEGER REFERENCES networks(id) ON DELETE SET NULL,
+  auth_source TEXT NOT NULL DEFAULT 'local', state TEXT NOT NULL DEFAULT 'Active' CHECK(state IN ('Active','Ended','Expired')),
+  started_at TEXT NOT NULL, ended_at TEXT, bytes_down INTEGER NOT NULL DEFAULT 0, bytes_up INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE credentials(id INTEGER PRIMARY KEY, name TEXT NOT NULL, kind TEXT NOT NULL DEFAULT 'Service',
+  target TEXT, username TEXT, secret_enc TEXT, note TEXT, created_at TEXT NOT NULL);
+""",
+"""
+-- Phase 4: schedules, bandwidth policies, access policies ------------------------
+CREATE TABLE schedules(id INTEGER PRIMARY KEY, name TEXT UNIQUE NOT NULL, applies_group TEXT,
+  days TEXT NOT NULL DEFAULT 'Mon,Tue,Wed,Thu,Fri', start TEXT NOT NULL DEFAULT '08:00', end TEXT NOT NULL DEFAULT '18:00',
+  max_session_minutes INTEGER, enabled INTEGER NOT NULL DEFAULT 1, note TEXT, created_at TEXT NOT NULL);
+CREATE TABLE bandwidth_policies(id INTEGER PRIMARY KEY, name TEXT NOT NULL, scope TEXT NOT NULL DEFAULT 'Role',
+  target TEXT, down INTEGER NOT NULL DEFAULT 0, up INTEGER NOT NULL DEFAULT 0, unit TEXT NOT NULL DEFAULT 'Mbps',
+  priority INTEGER NOT NULL DEFAULT 100, enabled INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL);
+CREATE TABLE access_policies(id INTEGER PRIMARY KEY, name TEXT UNIQUE NOT NULL, applies_group TEXT,
+  priority INTEGER NOT NULL DEFAULT 100, enabled INTEGER NOT NULL DEFAULT 1, description TEXT, created_at TEXT NOT NULL);
+CREATE TABLE policy_zones(id INTEGER PRIMARY KEY, policy_id INTEGER NOT NULL REFERENCES access_policies(id) ON DELETE CASCADE,
+  zone TEXT NOT NULL, action TEXT NOT NULL DEFAULT 'Deny' CHECK(action IN ('Allow','Deny','Reject')), UNIQUE(policy_id, zone));
+""",
+"""
+-- Phase 5: firewall rules (managed configuration; enforcement needs a provider) ---
+CREATE TABLE firewall_rules(id INTEGER PRIMARY KEY, position INTEGER NOT NULL, name TEXT,
+  action TEXT NOT NULL DEFAULT 'Allow' CHECK(action IN ('Allow','Deny','Reject')), protocol TEXT NOT NULL DEFAULT 'Any',
+  source TEXT NOT NULL DEFAULT 'Any', destination TEXT NOT NULL DEFAULT 'Any', port TEXT,
+  schedule_id INTEGER REFERENCES schedules(id) ON DELETE SET NULL, logging INTEGER NOT NULL DEFAULT 1,
+  enabled INTEGER NOT NULL DEFAULT 1, description TEXT, hits INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL);
+""",
+"""
+-- Phase 6: alerts / incidents ----------------------------------------------------
+CREATE TABLE alerts(id INTEGER PRIMARY KEY, severity TEXT NOT NULL DEFAULT 'INFO' CHECK(severity IN ('INFO','WARNING','CRITICAL')),
+  kind TEXT NOT NULL, source TEXT, message TEXT NOT NULL, state TEXT NOT NULL DEFAULT 'Open' CHECK(state IN ('Open','Acknowledged','Resolved')),
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+""",
 ]
 
 def connect() -> sqlite3.Connection:
